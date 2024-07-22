@@ -45,38 +45,41 @@ def main(stdscr):
 
     height = max(len(slot_numbers) + 4, len(gpu_info_list) + 5, 10)
 
-    slot_window_width = 30
-    slot_window = curses.newwin(height, slot_window_width, 1, 1)
-    display_box(slot_window, 1, 1, height, slot_window_width, "Available Slot Numbers")
-    slot_window.addstr(1, 2, 'Slot Number\tBDF'.expandtabs(5))
-    for i, slot in enumerate(slot_numbers):
-        slot = slot.split(" : ")
-        slot_window.addstr(i + 2, 2, '{:<14s} {:<10s}'.format(slot[0], slot[1]))
-    slot_window.refresh()
+    # slot_window_width = 30
+    # slot_window = curses.newwin(height, slot_window_width, 1, 1)
+    # display_box(slot_window, 1, 1, height, slot_window_width, "Available Slot Numbers")
+    # slot_window.addstr(1, 2, 'Slot Number\tBDF'.expandtabs(5))
+    # for i, slot in enumerate(slot_numbers):
+    #     slot = slot.split(" : ")
+    #     slot_window.addstr(i + 2, 2, '{:<14s} {:<10s}'.format(slot[0], slot[1]))
+    # slot_window.refresh()
 
     # Display GPU information 
     gpu_window_height = height  
-    gpu_window_width = 75
-    gpu_window = curses.newwin(gpu_window_height, gpu_window_width, 1, slot_window_width+3)
+    gpu_window_width = 57
+    gpu_window = curses.newwin(gpu_window_height, gpu_window_width, 1, 1)
     display_box(gpu_window, 1, 41, gpu_window_height, gpu_window_width, "GPU Info")
     gpu_window.addstr(2, 2, " GPU |   BDF   | Root Port | Slot | PSB | Connector ")
     gpu_window.addstr(3, 2, "----------------------------------------------------")
     for i, gpu_info in enumerate(gpu_info_list):
+        # gpu_print = f"GPU {i}\t|\tBDF: {gpu_info[0]}\t|\tSlot: {gpu_info[1]}\t|\tRoot Port: {gpu_info[2]}\t|\tPSB {gpu_info[3]}"
+        # gpu_print = f"  {i}  | {gpu_info[0]} |  {gpu_info[2]}  |  {gpu_info[1]}  |  {gpu_info[3]}  | {gpu_info[4]}"
         gpu_print = f"{i:^5}|{gpu_info[0]:^9}|{gpu_info[2]:^11}|{gpu_info[1]:^6}|{gpu_info[3]:^5}| {gpu_info[4]}"
         gpu_window.addstr(i+4, 2, gpu_print.expandtabs(3))
     gpu_window.refresh()
 
     # Create Output Window
-    output_window_height = 20
-    output_window_width = 55
-    output_window = curses.newpad(10000, 55)
-    output_window_border = curses.newwin(output_window_height, output_window_width, height + 2, 50+3)
-    display_box(output_window_border, 10, 41, height, slot_window_width+3, "Output")
+    output_window_height = height + 21
+    output_window_width = 53
+    output_window = curses.newpad(10000, 53)
+    output_window_left_corner = [gpu_window_width+2, 1]
+    output_window_border = curses.newwin(output_window_height, output_window_width, output_window_left_corner[1], output_window_left_corner[0])
+    display_box(output_window_border, 10, 41, height, gpu_window_width+3, "Output")
     pad_pos = 0
 
     # Collect user inputs
     input_window_height = 20
-    input_window_width = 50
+    input_window_width = 57
     input_window = curses.newwin(input_window_height-4, input_window_width-4, height + 4, 3)
     input_window_border = curses.newwin(input_window_height, input_window_width, height + 2, 1)
     display_box(input_window_border, height + 2, 1, input_window_height, input_window_width, "Command Line")
@@ -172,10 +175,15 @@ def main(stdscr):
         input_window.clrtoeol()
         input_window.addstr(15, 0, "Running gpu_burn...")
         input_window.refresh()
+        # gpu_burn_process = multiprocessing.Process(target=gpu_burn_script.check_replay, args=(gpu_percent, gpu_run_time, 4, [], 10, output_window, height + 3, 55, output_window_height, output_window_width, pad_pos))
+        # gpu_burn_process.start()
+        # while gpu_burn_process.is_alive():
+
+        # gpu_burn_process.join()
         done = False
-        t = threading.Thread(target=animate, args=('g',))
+        t = threading.Thread(target=animate, args=('g'))
         t.start()
-        pad_pos = gpu_burn_script.check_replay(gpu_percent, gpu_run_time, 4, [], 10, output_window, height + 3, 55, output_window_height, output_window_width, pad_pos)
+        pad_pos = gpu_burn_script.check_replay(gpu_percent, gpu_run_time, 4, [], 10, output_window, output_window_left_corner[1], output_window_left_corner[0], output_window_height, output_window_width, pad_pos)
         done = True
         input_window.addstr(gpu_pos, 0, "[x]\t".expandtabs(2) + notify)
         input_window.refresh()
@@ -189,7 +197,7 @@ def main(stdscr):
         pad_pos = gpu_burn_script.output_print(output_window, height + 3, 55, output_window_height, output_window_width, pad_pos, "Running 629_diag...")
         input_window.refresh()
         done = False
-        t = threading.Thread(target=animate, args=('d',))
+        t = threading.Thread(target=animate, args=('d'))
         t.start()
         run_629_diag.main()
         pad_pos = gpu_burn_script.output_print(output_window, height + 3, 55, output_window_height, output_window_width, pad_pos, "629_Diag Finished Running")
@@ -198,7 +206,7 @@ def main(stdscr):
         input_window.addstr(diag_pos, 0, "[x]\tRun 629 Diag".expandtabs(2))
         input_window.refresh()
         time.sleep(1.5)
-
+        
     if 's' in operations:
         device_window_height = 20
         device_window = curses.newwin(device_window_height, 107, height + 2, 1)
