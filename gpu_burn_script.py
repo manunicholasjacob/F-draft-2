@@ -2,6 +2,8 @@ import subprocess
 from datetime import datetime
 import time
 import curses
+import numpy as np
+import functions
 
 # Function to Print to Output Window
 def output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = ""):
@@ -11,20 +13,6 @@ def output_print(window, window_offset_y, window_offset_x, window_height, window
         pad_pos += int(len(input)/window_width) + 1
     window.refresh(pad_pos, 0, window_offset_y+1, window_offset_x, min(curses.LINES-1, window_offset_y + window_height - 3), min(curses.COLS-1, window_offset_x + window_width - 5))
     return pad_pos
-
-def execute_shell_command(command):
-    try:
-        # Execute the shell command
-        result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            # Successful execution
-            return result.stdout.decode("utf-8").strip()  # Decode bytes to string
-        else:
-            # Error occurredhttps://github.com/manunicholasjacob/Testing/blob/main/getbdf2
-            return f"Error: {result.stderr.decode('utf-8').strip()}"  # Decode bytes to string
-    except Exception as e:
-        return f"Error: {str(e)}"
-
 
 def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, window, window_offset_y, window_offset_x, window_height, window_width, pad_pos):
     try:
@@ -47,7 +35,7 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
             for index in gpu_index:
                 # print(f"GPU {index}:")
                 pad_pos = output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = f"GPU {index}:")
-                replay_count = execute_shell_command(f"nvidia-smi -i {index} -q|grep -i replay")
+                replay_count = functions.execute_shell_command(f"nvidia-smi -i {index} -q|grep -i replay")
                 replay_count = replay_count.split("\n")
                 for line in replay_count: 
                     # print(line.strip())
@@ -57,7 +45,7 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
             for i in range(gpu_number):
                 # print(f"GPU {i}:")
                 pad_pos = output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = f"GPU {i}:")
-                replay_count = execute_shell_command(f"nvidia-smi -i {i} -q|grep -i replay")
+                replay_count = functions.execute_shell_command(f"nvidia-smi -i {i} -q|grep -i replay")
                 replay_count = replay_count.split("\n")
                 for line in replay_count: 
                     # print(line.strip())
@@ -69,7 +57,7 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
     # print("gpu_burn has completed.")
     pad_pos = output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = "gpu_burn has completed.")
     pad_pos = output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = "Writing to gpu_burn_output.txt")
-    bdf_read = execute_shell_command("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader")
+    bdf_read = functions.execute_shell_command("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader")
     bdf_read = bdf_read.split('\n')
     bdf_read = [":".join(line.split(':')[1:]) for line in bdf_read]
     with open("./gpu_burn_output.txt","w") as file:
@@ -79,14 +67,14 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
                 if i in gpu_index: bdfs.append(bdf)
             for i, bdf in enumerate(bdfs):
                 file.write(f"GPU {gpu_index[i]} - " + bdf + ":\n")
-                replay_count = execute_shell_command(f"nvidia-smi -i {gpu_index[i]} -q|grep -i replay")
+                replay_count = functions.execute_shell_command(f"nvidia-smi -i {gpu_index[i]} -q|grep -i replay")
                 replay_count = replay_count.split("\n")
                 for line in replay_count: file.write(line.strip() + "\n")
                 file.write("\n")
         else:
             for gpu_index_tag, bdf in enumerate(bdf_read): 
                 file.write(f"GPU {gpu_index_tag} - " + bdf + ":\n")
-                replay_count = execute_shell_command(f"nvidia-smi -i {gpu_index_tag} -q|grep -i replay")
+                replay_count = functions.execute_shell_command(f"nvidia-smi -i {gpu_index_tag} -q|grep -i replay")
                 replay_count = replay_count.split("\n")
                 for line in replay_count: file.write(line.strip() + "\n")
                 file.write("\n")
@@ -99,62 +87,28 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
 
 
 
-
-
-
-
-
-def run_command(command):
-    result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = result.communicate()
-    if result.returncode != 0:
-        raise Exception(f"Command failed with error: {stderr.decode('utf-8')}")
-    return stdout.decode('utf-8')
-
-def get_bdf_list():
-    """ Get a list of all BDFs using lspci. """
-    output = run_command("lspci")
-    bdf_list = [line.split()[0] for line in output.splitlines()]
-    return bdf_list
-
-def get_vendor_bdf_list(vendor_id):
-    """ Get a list of BDFs for a specific vendor using lspci. """
-    output = run_command(f"lspci -d {vendor_id}:")
-    vendor_bdf_list = [line.split()[0] for line in output.splitlines()]
-    return vendor_bdf_list
-
-def get_header_type(bdf):
-    
-    header_type = run_command(f"setpci -s {bdf} HEADER_TYPE")
-    return header_type.strip()
-
-def get_secondary_bus_number(bdf):
-    """ Get the secondary bus number for a given BDF using setpci. """
-    secondary_bus_number = run_command(f"setpci -s {bdf} SECONDARY_BUS")
-    return secondary_bus_number.strip()
-
-def read_slot_capabilities(bdf):
-    try:
-        slot_capabilities_output = subprocess.check_output(["setpci", "-s", bdf, "CAP_EXP+0X14.l"])
-        return slot_capabilities_output.decode().strip()
-    except subprocess.CalledProcessError:
-        return None
-    
-def hex_to_binary(hex_string):
-    binary_string = format(int(hex_string, 16), '032b')
-    return binary_string
-
 def gpu_traverse_up():
-    # use nvidia-smi to get all the BDF of the GPUs
-    bdf_read = execute_shell_command("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader")
-    bdf_read = bdf_read.split('\n')
-    bdf_read = [":".join(line.split(':')[1:]) for line in bdf_read]
-    gpu_bdf_list = [bdf.lower() for bdf in bdf_read]
     # get a list of all bdfs
-    all_bdf_list = get_bdf_list()
+    all_bdf_list = functions.get_bdf_list()
+
+    try:
+        # use nvidia-smi to get all the BDF of the GPUs
+        bdf_read = functions.execute_shell_command("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader")
+        bdf_read = bdf_read.split('\n')
+        bdf_read = [":".join(line.split(':')[1:]) for line in bdf_read]
+        gpu_bdf_list = [bdf.lower() for bdf in bdf_read]
+    except Exception as e:
+        pass
+
+    if len(gpu_bdf_list) == 0 or  gpu_bdf_list[0] == ' ':
+        gpu_bdf_list = []
+        for bdf in all_bdf_list:
+            class_code_hex = functions.read_class_code(bdf)
+            header_type = functions.get_header_type(bdf)
+            if class_code_hex[:2] == "03" and header_type == "00": gpu_bdf_list.append(bdf)
 
     #get a list of all bdfs with header type 1
-    header_bdf_list = [bdf for bdf in all_bdf_list if get_header_type(bdf).startswith("01")]
+    header_bdf_list = [bdf for bdf in all_bdf_list if functions.get_header_type(bdf).startswith("01")]
 
     physical_slot_numbers = []
     root_ports = []
@@ -174,7 +128,7 @@ def gpu_traverse_up():
 
             # find the bdf with a secondary bus of our current bus
             for bdf in header_bdf_list:
-                if get_secondary_bus_number(bdf) == current_bus:
+                if functions.get_secondary_bus_number(bdf) == current_bus:
                     upstream_connection = bdf 
 
             # if no upstream connection is found, we are at the root port, report and add to list
@@ -185,10 +139,10 @@ def gpu_traverse_up():
                 break
             else:
                 # print("Upstream Connection: " + f"{upstream_connection}")
-                slot_capabilities = read_slot_capabilities(upstream_connection)
+                slot_capabilities = functions.read_slot_capabilities(upstream_connection)
                 # Extract the physical slot number from slot capabilities bits [31:19]
                 # Convert from hex to binary to decimal
-                slot_number = int(hex_to_binary(slot_capabilities)[:13], 2)
+                slot_number = int(functions.hex_to_binary(slot_capabilities)[:13], 2)
 
                 # print(f"slot_number: {slot_number}")
 
@@ -201,11 +155,23 @@ def gpu_traverse_up():
         
         # if a valid physical port was not found, report
         if(not port_found):
-            physical_slot_numbers.append(-1)
+            physical_slot_numbers.append(slot_number)
+    
     # gpu_streams = {gpuBDF : [physical_slot_numbers[i], root_ports[i]] for i, gpuBDF in enumerate(gpu_bdf_list)}
-    psb_number = [1, 1, 2, 2, 4, 4, 3, 3] if len(gpu_bdf_list) > 4 else [1, 2, 4, 3]
-    connector = ["R1", "SL13, SL14", "SL3, SL4", "SL7, SL8", "SL11, SL12", "R4", "SL1, SL2", "SL5, SL6"] if len(gpu_bdf_list) > 4 else ["R1", "SL7, SL8", "SL11, SL12", "SL5, SL6"]
-    gpu_streams = [[gpuBDF, physical_slot_numbers[i], root_ports[i], psb_number[i], connector[i]] for i, gpuBDF in enumerate(gpu_bdf_list)]
+    fryer_slots = [28, 24, 23, 27, 25, 21, 26, 22]
+    psb_number = [1, 1, 2, 2, 4, 4, 3, 3]
+    connector = ["R1", "SL13, SL14", "SL3, SL4", "SL7, SL8", "SL11, SL12", "R4", "SL1, SL2", "SL5, SL6"]
+
+    gpu_streams = []
+    for i, gpuBDF in enumerate(gpu_bdf_list):   
+        if physical_slot_numbers[i] != 0:
+            if physical_slot_numbers[i] in fryer_slots:
+                info_index = fryer_slots.index(physical_slot_numbers[i])
+                gpu_streams.append([gpuBDF, physical_slot_numbers[i], root_ports[i], psb_number[info_index], connector[info_index]])
+            else:
+                gpu_streams.append([gpuBDF, physical_slot_numbers[i], root_ports[i], "N/A", "N/A"])
+
+    # gpu_streams = [[gpuBDF, physical_slot_numbers[i], root_ports[i], psb_number[i], connector[i]] for i, gpuBDF in enumerate(gpu_bdf_list)]
     return gpu_streams
 
 def main():
