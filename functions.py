@@ -1,4 +1,5 @@
 import subprocess
+import curses
 
 def execute_shell_command(command):
     try:
@@ -33,7 +34,6 @@ def get_vendor_bdf_list(vendor_id):
     return vendor_bdf_list
 
 def get_header_type(bdf):
-    
     header_type = run_command(f"setpci -s {bdf} HEADER_TYPE")
     return header_type.strip()
 
@@ -52,3 +52,30 @@ def read_slot_capabilities(bdf):
 def hex_to_binary(hex_string):
     binary_string = format(int(hex_string, 16), '032b')
     return binary_string
+
+def read_class_code(bdf):
+    try:
+        class_control = subprocess.check_output(["setpci", "-s", bdf, "08.l"])
+        return class_control.decode().strip()
+    except subprocess.CalledProcessError:
+        return f"Error reading Bridge Control for {bdf}."
+    
+def identify_gpus():
+    command_output = execute_shell_command("lspci | cut -d ' ' -f 1")
+    bdf_list = [num for num in command_output.split('\n') if num]
+ 
+    gpus = []
+    for bdf in bdf_list:
+        class_code = read_class_code(bdf)
+        header_type = get_header_type(bdf)
+        if class_code and class_code[:2] == '03' and header_type[-2:] == '00':
+            gpus.append(bdf)
+    return gpus
+
+def output_print(window, window_offset_y, window_offset_x, window_height, window_width, pad_pos, input = "", new_line=1):
+    pady, padx = window.getyx()
+    window.addstr(pady+new_line, 0, input)
+    if pady+1 > window_height-4:  
+        pad_pos += int(len(input)/window_width) + 1
+    window.refresh(pad_pos, 0, window_offset_y+1, window_offset_x, min(curses.LINES-1, window_offset_y + window_height - 3), min(curses.COLS-1, window_offset_x + window_width - 5))
+    return pad_pos
